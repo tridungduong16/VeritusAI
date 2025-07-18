@@ -1,43 +1,21 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { Send, ArrowLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'bot';
-  timestamp: Date;
-}
+import { useChatContext } from '@/contexts/ChatContext';
 
 const ChatbotScreen: React.FC = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState<string>('');
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
+  const router = useRouter();
+  const { messages, isLoading, sendMessage } = useChatContext();
 
   const handleSendMessage = () => {
     if (inputText.trim()) {
-      const newUserMessage: Message = {
-        id: Date.now().toString(),
-        text: inputText.trim(),
-        sender: 'user',
-        timestamp: new Date(),
-      };
-      setMessages((prevMessages) => [...prevMessages, newUserMessage]);
+      sendMessage(inputText.trim());
       setInputText('');
-
-      // Simulate bot response
-      setTimeout(() => {
-        const botResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          text: `Echo: ${newUserMessage.text}`, // Simple echo bot for now
-          sender: 'bot',
-          timestamp: new Date(),
-        };
-        setMessages((prevMessages) => [...prevMessages, botResponse]);
-      }, 1000);
     }
   };
 
@@ -45,20 +23,20 @@ const ChatbotScreen: React.FC = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const renderMessage = ({ item }: { item: Message }) => (
+  const renderMessage = ({ item }) => (
     <View style={[
       styles.messageContainer, 
-      item.sender === 'user' ? styles.userMessage : styles.botMessage
+      item.isUser ? styles.userMessage : styles.botMessage
     ]}>
       <Text style={[
         styles.messageText,
-        item.sender === 'user' && styles.userMessageText
+        item.isUser && styles.userMessageText
       ]}>
         {item.text}
       </Text>
       <Text style={[
         styles.messageTime,
-        item.sender === 'user' && styles.userMessageTime
+        item.isUser && styles.userMessageTime
       ]}>
         {formatTime(item.timestamp)}
       </Text>
@@ -74,10 +52,10 @@ const ChatbotScreen: React.FC = () => {
       />
       
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <ArrowLeft size={24} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Chatbot</Text>
+        <Text style={styles.headerTitle}>Trò chuyện</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -107,9 +85,11 @@ const ChatbotScreen: React.FC = () => {
           <TouchableOpacity
             style={({ pressed }) => [
               styles.sendButton,
-              pressed && styles.sendButtonPressed
+              pressed && styles.sendButtonPressed,
+              isLoading && styles.sendButtonDisabled
             ]}
             onPress={handleSendMessage}
+            disabled={isLoading}
           >
             <Send size={20} color="white" />
           </TouchableOpacity>
@@ -133,6 +113,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerTitle: {
+    fontFamily: 'Inter-Bold',
     fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
@@ -163,6 +144,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2A2B3D',
   },
   messageText: {
+    fontFamily: 'Inter-Regular',
     fontSize: 16,
     color: '#FFF',
   },
@@ -170,6 +152,7 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   messageTime: {
+    fontFamily: 'Inter-Regular',
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.7)',
     alignSelf: 'flex-end',
@@ -192,6 +175,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
+    fontFamily: 'Inter-Regular',
     fontSize: 16,
     color: '#FFF',
     maxHeight: 100,
@@ -207,6 +191,9 @@ const styles = StyleSheet.create({
   },
   sendButtonPressed: {
     backgroundColor: '#D66A00',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#666',
   },
 });
 

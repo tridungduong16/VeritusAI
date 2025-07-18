@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { nanoid } from 'nanoid/non-secure';
 
 export type Message = {
   id: string;
@@ -114,13 +115,17 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       setChatHistory(prevHistory => {
         return prevHistory.map(chat => {
           if (chat.id === currentChatId) {
+            // Find first user message if it exists
+            const firstUserMessage = messages.find(m => m.isUser);
+            const userMessageText = firstUserMessage?.text || '';
+            
             return {
               ...chat,
               messages: [...messages],
               updatedAt: new Date(),
               // Update title based on first user message if not already set
               title: chat.title === 'Cuộc trò chuyện mới' && messages.some(m => m.isUser) 
-                ? messages.find(m => m.isUser)?.text.substring(0, 30) + '...'
+                ? userMessageText.substring(0, 30) + (userMessageText.length > 30 ? '...' : '')
                 : chat.title
             };
           }
@@ -146,7 +151,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     
     // Add user message
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: nanoid(),
       text: text,
       isUser: true,
       timestamp: new Date(),
@@ -158,7 +163,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     // Simulate API call delay
     setTimeout(() => {
       const botResponse: Message = {
-        id: (Date.now() + 1).toString(),
+        id: nanoid(),
         text: getRandomResponse(text),
         isUser: false,
         timestamp: new Date(),
@@ -176,13 +181,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
 
   const startNewChat = () => {
     const welcomeMessage: Message = {
-      id: Date.now().toString(),
+      id: nanoid(),
       text: 'Xin chào! Tôi có thể giúp gì cho bạn hôm nay?',
       isUser: false,
       timestamp: new Date(),
     };
     
-    const newChatId = Date.now().toString();
+    const newChatId = nanoid();
     const newChat: ChatSession = {
       id: newChatId,
       title: 'Cuộc trò chuyện mới',

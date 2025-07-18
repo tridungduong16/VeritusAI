@@ -14,8 +14,9 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Send, Trash2, MessageSquare, History } from 'lucide-react-native';
-import { useChatContext, Message, ChatSession } from '@/contexts/ChatContext';
+import { useChatContext } from '@/contexts/ChatContext';
 import { ChatHistory } from '@/components/ChatHistory';
+import { useRouter } from 'expo-router';
 
 type TabName = 'chat' | 'history';
 
@@ -28,12 +29,14 @@ export default function ChatScreen() {
     chatHistory, 
     startNewChat, 
     loadChat, 
-    deleteChat 
+    deleteChat,
+    currentChatId
   } = useChatContext();
   const [inputText, setInputText] = React.useState('');
   const [activeTab, setActiveTab] = useState<TabName>('chat');
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
+  const router = useRouter();
 
   const handleSend = () => {
     if (inputText.trim() === '') return;
@@ -55,16 +58,11 @@ export default function ChatScreen() {
     setActiveTab('chat');
   };
 
-  const renderChatHistory = () => {
-    const historyItems = chatHistory.map(chat => ({
-      id: chat.id,
-      title: chat.title,
-      date: chat.updatedAt,
-      previewText: chat.messages.length > 1 
-        ? chat.messages[chat.messages.length - 1].text.substring(0, 60) + '...'
-        : 'Bắt đầu cuộc trò chuyện mới',
-    }));
+  const handleOpenFullChat = () => {
+    router.push('/chatbot');
+  };
 
+  const renderChatHistory = () => {
     return (
       <View style={styles.historyContainer}>
         <View style={styles.historyHeader}>
@@ -78,8 +76,10 @@ export default function ChatScreen() {
           </TouchableOpacity>
         </View>
         <ChatHistory 
-          history={historyItems} 
-          onSelectChat={handleSelectChat} 
+          history={chatHistory} 
+          onSelectChat={handleSelectChat}
+          onDeleteChat={deleteChat}
+          currentChatId={currentChatId}
         />
       </View>
     );
@@ -118,7 +118,7 @@ export default function ChatScreen() {
         
         {isLoading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#0066cc" />
+            <ActivityIndicator size="small" color="#F57C00" />
             <Text style={styles.loadingText}>Đang suy nghĩ...</Text>
           </View>
         )}
@@ -140,14 +140,23 @@ export default function ChatScreen() {
             <Pressable 
               style={({ pressed }) => [
                 styles.sendButton,
-                pressed && styles.sendButtonPressed
+                pressed && styles.sendButtonPressed,
+                isLoading && styles.sendButtonDisabled
               ]}
               onPress={handleSend}
+              disabled={isLoading}
             >
               <Send size={20} color="white" />
             </Pressable>
           </View>
         </KeyboardAvoidingView>
+
+        <TouchableOpacity 
+          style={styles.expandButton}
+          onPress={handleOpenFullChat}
+        >
+          <Text style={styles.expandButtonText}>Mở rộng</Text>
+        </TouchableOpacity>
       </>
     );
   };
@@ -175,7 +184,7 @@ export default function ChatScreen() {
           style={[styles.tab, activeTab === 'chat' && styles.activeTab]}
           onPress={() => setActiveTab('chat')}
         >
-          <MessageSquare size={18} color={activeTab === 'chat' ? '#0066cc' : '#666'} />
+          <MessageSquare size={18} color={activeTab === 'chat' ? '#F57C00' : '#999'} />
           <Text style={[styles.tabText, activeTab === 'chat' && styles.activeTabText]}>
             Trò chuyện
           </Text>
@@ -184,7 +193,7 @@ export default function ChatScreen() {
           style={[styles.tab, activeTab === 'history' && styles.activeTab]}
           onPress={() => setActiveTab('history')}
         >
-          <History size={18} color={activeTab === 'history' ? '#0066cc' : '#666'} />
+          <History size={18} color={activeTab === 'history' ? '#F57C00' : '#999'} />
           <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
             Lịch sử
           </Text>
@@ -199,17 +208,18 @@ export default function ChatScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#121212',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#0066cc',
+    backgroundColor: '#1D1E33',
     paddingVertical: 16,
     paddingHorizontal: 20,
   },
   headerTitle: {
+    fontFamily: 'Inter-Bold',
     fontSize: 20,
     fontWeight: 'bold',
     color: 'white',
@@ -218,18 +228,18 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   clearButtonPressed: {
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: '#1D1E33',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e5ea',
+    borderBottomColor: '#2A2B3D',
   },
   tab: {
     flex: 1,
@@ -241,21 +251,23 @@ const styles = StyleSheet.create({
   },
   activeTab: {
     borderBottomWidth: 2,
-    borderBottomColor: '#0066cc',
+    borderBottomColor: '#F57C00',
   },
   tabText: {
+    fontFamily: 'Inter-Medium',
     fontSize: 14,
-    color: '#666',
+    color: '#999',
   },
   activeTabText: {
-    color: '#0066cc',
-    fontWeight: 'bold',
+    color: '#F57C00',
   },
   messageList: {
     flex: 1,
+    backgroundColor: '#121212',
   },
   messageListContent: {
     padding: 16,
+    paddingBottom: 70,
   },
   messageBubble: {
     maxWidth: '80%',
@@ -264,23 +276,25 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   userMessage: {
+    backgroundColor: '#F57C00',
     alignSelf: 'flex-end',
-    backgroundColor: '#0066cc',
   },
   botMessage: {
+    backgroundColor: '#2A2B3D',
     alignSelf: 'flex-start',
-    backgroundColor: '#e5e5ea',
   },
   messageText: {
+    fontFamily: 'Inter-Regular',
     fontSize: 16,
-    color: '#333',
+    color: '#FFF',
   },
   userMessageText: {
-    color: 'white',
+    color: '#FFF',
   },
   messageTime: {
+    fontFamily: 'Inter-Regular',
     fontSize: 11,
-    color: '#777',
+    color: 'rgba(255, 255, 255, 0.7)',
     alignSelf: 'flex-end',
     marginTop: 4,
   },
@@ -290,46 +304,56 @@ const styles = StyleSheet.create({
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    backgroundColor: '#1D1E33',
+    borderRadius: 18,
     alignSelf: 'flex-start',
     marginLeft: 16,
-    marginBottom: 8,
+    marginBottom: 16,
   },
   loadingText: {
+    fontFamily: 'Inter-Regular',
     marginLeft: 8,
-    color: '#666',
-    fontSize: 14,
+    color: '#FFF',
   },
   inputContainer: {
     flexDirection: 'row',
     padding: 12,
-    backgroundColor: 'white',
+    backgroundColor: '#1D1E33',
     borderTopWidth: 1,
-    borderTopColor: '#e5e5ea',
+    borderTopColor: '#2A2B3D',
     alignItems: 'center',
   },
   input: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#2A2B3D',
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
+    fontFamily: 'Inter-Regular',
     fontSize: 16,
+    color: '#FFF',
     maxHeight: 100,
   },
   sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0066cc',
+    backgroundColor: '#F57C00',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
   },
   sendButtonPressed: {
-    backgroundColor: '#004c99',
+    backgroundColor: '#D66A00',
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#666',
   },
   historyContainer: {
     flex: 1,
+    backgroundColor: '#121212',
   },
   historyHeader: {
     flexDirection: 'row',
@@ -337,27 +361,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5ea',
-    backgroundColor: '#fff',
   },
   historyHeaderTitle: {
+    fontFamily: 'Inter-Bold',
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    color: '#FFF',
   },
   newChatButton: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#0066cc',
+    backgroundColor: '#F57C00',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 16,
+    alignItems: 'center',
     gap: 6,
   },
   newChatButtonText: {
-    color: 'white',
+    fontFamily: 'Inter-Medium',
     fontSize: 14,
-    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  expandButton: {
+    position: 'absolute',
+    bottom: 70,
+    right: 16,
+    backgroundColor: '#1D1E33',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#F57C00',
+  },
+  expandButtonText: {
+    fontFamily: 'Inter-Medium',
+    fontSize: 12,
+    color: '#F57C00',
   },
 }); 
