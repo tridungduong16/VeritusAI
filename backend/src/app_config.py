@@ -72,7 +72,7 @@ class AppConfig(BaseSettings):
     )
     MONGO_DB_NAME: Optional[str] = None
     MONGO_COLLECTION_NAME: Optional[str] = None
-
+    NEWS_API_KEY: Optional[str] = None
 
 # Initialize the configuration
 app_config = AppConfig()
