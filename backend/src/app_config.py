@@ -9,8 +9,8 @@ class AppConfig(BaseSettings):
     BINANCE_API_SECRET: Optional[str] = None
     APIKEY_GPT4: Optional[str] = None
     API_KEY_QDRANT: Optional[str] = None
-    COLLECTION_NAME: Optional[str] = None
-    COLLECTION_NAME_MEM: Optional[str] = None
+    COLLECTION_NAME_QDRANT: Optional[str] = None
+    COLLECTION_NAME_MONGO: Optional[str] = None
     DATA_PATH: Optional[str] = None
     OPENAI_MODEL_NAME: Optional[str] = None
     QDRANT_URL: Optional[str] = None
@@ -72,7 +72,7 @@ class AppConfig(BaseSettings):
     )
     MONGO_DB_NAME: Optional[str] = None
     MONGO_COLLECTION_NAME: Optional[str] = None
-    NEWS_API_KEY: Optional[str] = None
+    NEWSDATA_API: Optional[str] = None
 
 # Initialize the configuration
 app_config = AppConfig()

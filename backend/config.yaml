@@ -34,3 +34,8 @@ modules:
 
   - name: chat_with_agent
     enabled: true
+
+  - name: news_api
+    enabled: true
+    params:
+      query: "bitcoin"

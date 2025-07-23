@@ -101,20 +101,14 @@ class Orchestrator:
                 print(f"Insert result: {result}")
         if self.config["modules"][6]["name"] == "chat_with_agent":
             if self.config["modules"][6]["enabled"]:
-                # Create single agent instance to reuse
                 agent = Agent()
-
-                # Reuse UserThread for multiple questions
                 user_thread = UserThread(
                     user_id="1", thread_id="1", agent_name="calculator"
                 )
-
-                # Process multiple questions with same agent and thread
                 questions = [
                     "what is specification for D35s-5?",
                     "do the same for D40s-5?",
                 ]
-
                 for question in questions:
                     user_question = UserQuestion(
                         user_thread=user_thread, question=question

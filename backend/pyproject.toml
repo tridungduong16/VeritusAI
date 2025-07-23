@@ -35,4 +35,5 @@ dependencies = [
     "temp-mail>=0.2",
     "pymongo>=4.13.2",
     "git-filter-repo>=2.47.0",
+    "newsapi-python>=0.2.7",
 ]
