@@ -16,13 +16,10 @@ warnings.filterwarnings("ignore")
 
 
 class TTSService:
-    """Vietnamese Text-to-Speech service using viXTTS model"""
-
     def __init__(self, model_path: str = None):
         self.device = "cpu"
         self.logger = logging.getLogger(__name__)
         torch.set_num_threads(2)
-
         try:
             if model_path is None:
                 model_path = app_config.TTS_MODEL_PATH

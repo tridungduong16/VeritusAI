@@ -1,9 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Send, ArrowLeft } from 'lucide-react-native';
+import { Send, ArrowLeft, Clock, AlertCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatContext } from '@/contexts/ChatContext';
+import type { Message } from '@/contexts/ChatContext';
 
 const ChatbotScreen: React.FC = () => {
   const [inputText, setInputText] = useState<string>('');
@@ -23,25 +24,49 @@ const ChatbotScreen: React.FC = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
-  const renderMessage = ({ item }) => (
-    <View style={[
-      styles.messageContainer, 
-      item.isUser ? styles.userMessage : styles.botMessage
-    ]}>
-      <Text style={[
-        styles.messageText,
-        item.isUser && styles.userMessageText
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isError = !item.isUser && item.metadata?.error;
+    
+    return (
+      <View style={[
+        styles.messageContainer, 
+        item.isUser ? styles.userMessage : styles.botMessage,
+        isError && styles.errorMessage
       ]}>
-        {item.text}
-      </Text>
-      <Text style={[
-        styles.messageTime,
-        item.isUser && styles.userMessageTime
-      ]}>
-        {formatTime(item.timestamp)}
-      </Text>
-    </View>
-  );
+        <Text style={[
+          styles.messageText,
+          item.isUser && styles.userMessageText,
+          isError && styles.errorMessageText
+        ]}>
+          {item.text}
+        </Text>
+        
+        <View style={styles.messageFooter}>
+          {!item.isUser && item.metadata?.timeTaken && (
+            <View style={styles.timeTakenContainer}>
+              <Clock size={12} color="rgba(255, 255, 255, 0.7)" />
+              <Text style={styles.timeTakenText}>
+                {item.metadata.timeTaken.toFixed(2)}s
+              </Text>
+            </View>
+          )}
+          
+          {isError && (
+            <View style={styles.errorIndicator}>
+              <AlertCircle size={12} color="#FF6B6B" />
+            </View>
+          )}
+          
+          <Text style={[
+            styles.messageTime,
+            item.isUser && styles.userMessageTime
+          ]}>
+            {formatTime(item.timestamp)}
+          </Text>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -66,6 +91,14 @@ const ChatbotScreen: React.FC = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messagesList}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        ListFooterComponent={isLoading ? (
+          <View style={styles.loadingContainer}>
+            <View style={styles.loadingBubble}>
+              <ActivityIndicator size="small" color="#FFFFFF" />
+              <Text style={styles.loadingText}>Đang xử lý...</Text>
+            </View>
+          </View>
+        ) : null}
       />
 
       <KeyboardAvoidingView
@@ -81,6 +114,7 @@ const ChatbotScreen: React.FC = () => {
             placeholderTextColor="#999"
             multiline
             maxLength={500}
+            editable={!isLoading}
           />
           <TouchableOpacity
             style={({ pressed }) => [
@@ -89,9 +123,13 @@ const ChatbotScreen: React.FC = () => {
               isLoading && styles.sendButtonDisabled
             ]}
             onPress={handleSendMessage}
-            disabled={isLoading}
+            disabled={isLoading || inputText.trim() === ''}
           >
-            <Send size={20} color="white" />
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Send size={20} color="white" />
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -143,6 +181,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     backgroundColor: '#2A2B3D',
   },
+  errorMessage: {
+    backgroundColor: 'rgba(255, 107, 107, 0.2)',
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
   messageText: {
     fontFamily: 'Inter-Regular',
     fontSize: 16,
@@ -151,15 +194,36 @@ const styles = StyleSheet.create({
   userMessageText: {
     color: 'white',
   },
+  errorMessageText: {
+    color: '#FFD1D1',
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
   messageTime: {
     fontFamily: 'Inter-Regular',
     fontSize: 11,
     color: 'rgba(255, 255, 255, 0.7)',
-    alignSelf: 'flex-end',
-    marginTop: 4,
   },
   userMessageTime: {
     color: 'rgba(255, 255, 255, 0.7)',
+  },
+  timeTakenContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  timeTakenText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginLeft: 2,
+  },
+  errorIndicator: {
+    marginRight: 6,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -194,6 +258,23 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: '#666',
+  },
+  loadingContainer: {
+    padding: 8,
+    alignItems: 'flex-start',
+  },
+  loadingBubble: {
+    backgroundColor: '#2A2B3D',
+    borderRadius: 18,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    color: '#FFF',
+    marginLeft: 8,
   },
 });
 

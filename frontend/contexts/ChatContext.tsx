@@ -1,12 +1,20 @@
 import React, { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { nanoid } from 'nanoid/non-secure';
+import { sendChatMessage, ApiError } from '@/utils/api';
 
 export type Message = {
   id: string;
   text: string;
   isUser: boolean;
   timestamp: Date;
+  metadata?: {
+    timeTaken?: number;
+    error?: {
+      message: string;
+      status?: number;
+    };
+  };
 };
 
 export type ChatSession = {
@@ -50,15 +58,6 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string | null>(null);
-
-  // Sample responses for demonstration
-  const sampleResponses = [
-    "Cảm ơn câu hỏi của bạn. Tôi đang tìm kiếm thông tin phù hợp.",
-    "Đây là một câu hỏi thú vị. Dựa trên thông tin tôi có, tôi có thể giúp bạn như sau.",
-    "Tôi hiểu câu hỏi của bạn. Hãy để tôi giải thích chi tiết hơn về vấn đề này.",
-    "Đó là một chủ đề phức tạp. Tôi sẽ cố gắng giải thích một cách đơn giản nhất.",
-    "Cảm ơn bạn đã hỏi. Đây là thông tin bạn cần biết về vấn đề này."
-  ];
 
   // Load chat history from storage on initial load
   useEffect(() => {
@@ -135,13 +134,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     }
   }, [messages, currentChatId]);
 
-  const getRandomResponse = (question: string) => {
-    const randomIndex = Math.floor(Math.random() * sampleResponses.length);
-    const baseResponse = sampleResponses[randomIndex];
-    return `${baseResponse} Câu hỏi của bạn là về "${question}". Đây là phản hồi mẫu để minh họa chức năng chatbot.`;
-  };
-
-  const sendMessage = (text: string) => {
+  const sendMessage = async (text: string) => {
     if (text.trim() === '') return;
     
     // Ensure we have an active chat
@@ -160,18 +153,48 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
     setMessages(prevMessages => [...prevMessages, userMessage]);
     setIsLoading(true);
     
-    // Simulate API call delay
-    setTimeout(() => {
+    try {
+      // Call the real API
+      const startTime = Date.now();
+      const response = await sendChatMessage(text);
+      const endTime = Date.now();
+      const requestTime = (endTime - startTime) / 1000; // Convert to seconds
+      
+      // Create bot response from API response
       const botResponse: Message = {
         id: nanoid(),
-        text: getRandomResponse(text),
+        text: response.message,
         isUser: false,
         timestamp: new Date(),
+        metadata: {
+          timeTaken: response.time_taken || requestTime,
+        },
       };
       
       setMessages(prevMessages => [...prevMessages, botResponse]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      
+      // Add error message with more details
+      const errorMessage: Message = {
+        id: nanoid(),
+        text: error instanceof ApiError 
+          ? `Xin lỗi, đã xảy ra lỗi: ${error.message}`
+          : 'Xin lỗi, đã xảy ra lỗi khi xử lý tin nhắn của bạn. Vui lòng thử lại sau.',
+        isUser: false,
+        timestamp: new Date(),
+        metadata: {
+          error: {
+            message: error.message,
+            status: error instanceof ApiError ? error.status : undefined,
+          },
+        },
+      };
+      
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const clearMessages = () => {
