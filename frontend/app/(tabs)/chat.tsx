@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   TouchableOpacity,
+  ScrollView,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +18,7 @@ import { Send, Trash2, MessageSquare, History } from 'lucide-react-native';
 import { useChatContext } from '@/contexts/ChatContext';
 import { ChatHistory } from '@/components/ChatHistory';
 import { useRouter } from 'expo-router';
+import Markdown from 'react-native-markdown-package';
 
 type TabName = 'chat' | 'history';
 
@@ -62,6 +64,71 @@ export default function ChatScreen() {
     router.push('/chatbot');
   };
 
+  // Custom markdown styles
+  const markdownStyles = {
+    heading1: {
+      color: '#FFF',
+      fontSize: 24,
+      fontFamily: 'Inter-Bold',
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    heading2: {
+      color: '#FFF',
+      fontSize: 20,
+      fontFamily: 'Inter-Bold',
+      marginTop: 12,
+      marginBottom: 6,
+    },
+    heading3: {
+      color: '#FFF',
+      fontSize: 18,
+      fontFamily: 'Inter-Bold',
+      marginTop: 10,
+      marginBottom: 5,
+    },
+    text: {
+      color: '#FFF',
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+    },
+    strong: {
+      color: '#FFF',
+      fontWeight: 'bold',
+    },
+    em: {
+      color: '#FFF',
+      fontStyle: 'italic',
+    },
+    blockquote: {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      borderLeftWidth: 4,
+      borderLeftColor: '#F57C00',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginVertical: 4,
+    },
+    code: {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      color: '#FFF',
+      fontFamily: 'monospace',
+      padding: 8,
+      borderRadius: 4,
+    },
+    bullet_list: {
+      color: '#FFF',
+    },
+    list_item: {
+      color: '#FFF',
+      marginBottom: 4,
+    },
+    hr: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      height: 1,
+      marginVertical: 8,
+    },
+  };
+
   const renderChatHistory = () => {
     return (
       <View style={styles.historyContainer}>
@@ -100,12 +167,23 @@ export default function ChatScreen() {
               styles.messageBubble,
               item.isUser ? styles.userMessage : styles.botMessage
             ]}>
-              <Text style={[
-                styles.messageText,
-                item.isUser && styles.userMessageText
-              ]}>
-                {item.text}
-              </Text>
+              {item.isUser ? (
+                <Text style={[
+                  styles.messageText,
+                  item.isUser && styles.userMessageText
+                ]}>
+                  {item.text}
+                </Text>
+              ) : (
+                <ScrollView>
+                  <Markdown 
+                    styles={markdownStyles}
+                    enableLightBox={false}
+                  >
+                    {item.text}
+                  </Markdown>
+                </ScrollView>
+              )}
               <Text style={[
                 styles.messageTime,
                 item.isUser && styles.userMessageTime

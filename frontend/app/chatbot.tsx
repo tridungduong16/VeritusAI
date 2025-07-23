@@ -1,10 +1,11 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Send, ArrowLeft, Clock, AlertCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatContext } from '@/contexts/ChatContext';
 import type { Message } from '@/contexts/ChatContext';
+import Markdown from 'react-native-markdown-package';
 
 const ChatbotScreen: React.FC = () => {
   const [inputText, setInputText] = useState<string>('');
@@ -24,6 +25,71 @@ const ChatbotScreen: React.FC = () => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Custom markdown styles
+  const markdownStyles = {
+    heading1: {
+      color: '#FFF',
+      fontSize: 24,
+      fontFamily: 'Inter-Bold',
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    heading2: {
+      color: '#FFF',
+      fontSize: 20,
+      fontFamily: 'Inter-Bold',
+      marginTop: 12,
+      marginBottom: 6,
+    },
+    heading3: {
+      color: '#FFF',
+      fontSize: 18,
+      fontFamily: 'Inter-Bold',
+      marginTop: 10,
+      marginBottom: 5,
+    },
+    text: {
+      color: '#FFF',
+      fontSize: 16,
+      fontFamily: 'Inter-Regular',
+    },
+    strong: {
+      color: '#FFF',
+      fontWeight: 'bold',
+    },
+    em: {
+      color: '#FFF',
+      fontStyle: 'italic',
+    },
+    blockquote: {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      borderLeftWidth: 4,
+      borderLeftColor: '#F57C00',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      marginVertical: 4,
+    },
+    code: {
+      backgroundColor: 'rgba(255, 255, 255, 0.1)',
+      color: '#FFF',
+      fontFamily: 'monospace',
+      padding: 8,
+      borderRadius: 4,
+    },
+    bullet_list: {
+      color: '#FFF',
+    },
+    list_item: {
+      color: '#FFF',
+      marginBottom: 4,
+    },
+    hr: {
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      height: 1,
+      marginVertical: 8,
+    },
+  };
+
   const renderMessage = ({ item }: { item: Message }) => {
     const isError = !item.isUser && item.metadata?.error;
     
@@ -33,13 +99,23 @@ const ChatbotScreen: React.FC = () => {
         item.isUser ? styles.userMessage : styles.botMessage,
         isError && styles.errorMessage
       ]}>
-        <Text style={[
-          styles.messageText,
-          item.isUser && styles.userMessageText,
-          isError && styles.errorMessageText
-        ]}>
-          {item.text}
-        </Text>
+        {item.isUser ? (
+          <Text style={[
+            styles.messageText,
+            styles.userMessageText,
+          ]}>
+            {item.text}
+          </Text>
+        ) : (
+          <ScrollView style={styles.markdownScrollView}>
+            <Markdown 
+              styles={markdownStyles}
+              enableLightBox={false}
+            >
+              {item.text}
+            </Markdown>
+          </ScrollView>
+        )}
         
         <View style={styles.messageFooter}>
           {!item.isUser && item.metadata?.timeTaken && (
@@ -196,6 +272,9 @@ const styles = StyleSheet.create({
   },
   errorMessageText: {
     color: '#FFD1D1',
+  },
+  markdownScrollView: {
+    maxHeight: 400, // Limit height for very long markdown content
   },
   messageFooter: {
     flexDirection: 'row',
