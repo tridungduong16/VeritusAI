@@ -160,10 +160,13 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       const endTime = Date.now();
       const requestTime = (endTime - startTime) / 1000; // Convert to seconds
       
+      // Get the response text and ensure it's properly formatted
+      let responseText = response.message;
+      
       // Create bot response from API response
       const botResponse: Message = {
         id: nanoid(),
-        text: response.message,
+        text: responseText,
         isUser: false,
         timestamp: new Date(),
         metadata: {
@@ -172,7 +175,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
       };
       
       setMessages(prevMessages => [...prevMessages, botResponse]);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error sending message:', error);
       
       // Add error message with more details
@@ -205,7 +208,7 @@ export const ChatProvider: React.FC<ChatProviderProps> = ({ children }) => {
   const startNewChat = () => {
     const welcomeMessage: Message = {
       id: nanoid(),
-      text: 'Xin chào! Tôi có thể giúp gì cho bạn hôm nay?',
+      text: '# Xin chào! 👋\n\nTôi là **Veritusa AI**, bạn có muốn cập nhật những tin tức thời sự nóng hổi nhất.',
       isUser: false,
       timestamp: new Date(),
     };

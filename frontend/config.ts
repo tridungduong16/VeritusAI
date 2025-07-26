@@ -2,7 +2,7 @@
 export const API_CONFIG = {
   // Base URL for the backend API
   // Use environment variable if available, otherwise use default
-  BASE_URL: process.env.EXPO_PUBLIC_API_URL || 'http://0.0.0.0:8011',
+  BASE_URL: process.env.EXPO_PUBLIC_API_URL || 'https://1fdce01665a7.ngrok-free.app',
   
   // Specific endpoints
   ENDPOINTS: {
