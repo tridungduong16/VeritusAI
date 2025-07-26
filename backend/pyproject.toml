@@ -28,7 +28,6 @@ dependencies = [
     "black>=25.1.0",
     "isort>=6.0.1",
     "docling>=2.40.0",
-    "numpy>=2.3.1",
     "boto3>=1.39.4",
     "tempmail-python>=2.3.3",
     "tempmail-lol>=3.0.0",
@@ -37,5 +36,4 @@ dependencies = [
     "git-filter-repo>=2.47.0",
     "newsapi-python>=0.2.7",
     "maturin>=1.9.1",
-    "deepfilternet",
 ]
