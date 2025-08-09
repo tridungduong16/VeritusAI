@@ -10,6 +10,7 @@ from src.database_handler.document_parser import DocumentParser
 from src.database_handler.mongodb_handler import MemoryHandler
 from src.agent import Agent
 from src.schema import UserQuestion, UserThread
+from src.tts.tts_service import TTSService
 
 load_dotenv()
 
@@ -114,7 +115,15 @@ class Orchestrator:
                         user_thread=user_thread, question=question
                     )
                     agent.print_stream(user_question)
-
+        if self.config["modules"][7]["name"] == "convert_markdown_folder_to_speech":
+            if self.config["modules"][7]["enabled"]:
+                tts_service = TTSService()
+                tts_service.convert_markdown_folder_to_speech(
+                    self.config["modules"][7]["params"]["input_path"],
+                    self.config["modules"][7]["params"]["output_path"],
+                    self.config["modules"][7]["params"]["language"],
+                    self.config["modules"][7]["params"]["overwrite"],
+                )
 
 def main():
     orchestrator = Orchestrator("./config.yaml")
