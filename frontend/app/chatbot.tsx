@@ -1,17 +1,16 @@
 import React, { useState, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator, ScrollView } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { Send, ArrowLeft, Clock, AlertCircle } from 'lucide-react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { Stack } from 'expo-router';
+import { Send } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatContext } from '@/contexts/ChatContext';
 import type { Message } from '@/contexts/ChatContext';
-import Markdown from 'react-native-markdown-package';
+import Markdown from 'react-native-markdown-display';
 
 const ChatbotScreen: React.FC = () => {
   const [inputText, setInputText] = useState<string>('');
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
-  const router = useRouter();
   const { messages, isLoading, sendMessage } = useChatContext();
 
   const handleSendMessage = () => {
@@ -21,72 +20,43 @@ const ChatbotScreen: React.FC = () => {
     }
   };
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
-
-  // Custom markdown styles
+  // Custom markdown styles for bot messages
   const markdownStyles = {
+    body: {
+      color: '#1F2937',
+      fontSize: 14,
+      fontFamily: 'Inter-Regular',
+    },
     heading1: {
-      color: '#FFF',
-      fontSize: 24,
-      fontFamily: 'Inter-Bold',
-      marginTop: 16,
-      marginBottom: 8,
-    },
-    heading2: {
-      color: '#FFF',
-      fontSize: 20,
-      fontFamily: 'Inter-Bold',
-      marginTop: 12,
-      marginBottom: 6,
-    },
-    heading3: {
-      color: '#FFF',
+      color: '#1F2937',
       fontSize: 18,
       fontFamily: 'Inter-Bold',
-      marginTop: 10,
-      marginBottom: 5,
+      fontWeight: 'bold' as const,
     },
-    text: {
-      color: '#FFF',
+    heading2: {
+      color: '#1F2937',
       fontSize: 16,
+      fontFamily: 'Inter-Bold',
+      fontWeight: 'bold' as const,
+    },
+    paragraph: {
+      color: '#1F2937',
+      fontSize: 14,
       fontFamily: 'Inter-Regular',
     },
     strong: {
-      color: '#FFF',
-      fontWeight: 'bold',
+      color: '#1F2937',
+      fontWeight: 'bold' as const,
     },
     em: {
-      color: '#FFF',
-      fontStyle: 'italic',
+      color: '#1F2937',
+      fontStyle: 'italic' as const,
     },
-    blockquote: {
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      borderLeftWidth: 4,
-      borderLeftColor: '#F57C00',
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      marginVertical: 4,
-    },
-    code: {
-      backgroundColor: 'rgba(255, 255, 255, 0.1)',
-      color: '#FFF',
+    code_inline: {
+      backgroundColor: 'rgba(31, 41, 55, 0.1)',
+      color: '#1F2937',
       fontFamily: 'monospace',
-      padding: 8,
-      borderRadius: 4,
-    },
-    bullet_list: {
-      color: '#FFF',
-    },
-    list_item: {
-      color: '#FFF',
-      marginBottom: 4,
-    },
-    hr: {
-      backgroundColor: 'rgba(255, 255, 255, 0.2)',
-      height: 1,
-      marginVertical: 8,
+      fontSize: 12,
     },
   };
 
@@ -95,50 +65,23 @@ const ChatbotScreen: React.FC = () => {
     
     return (
       <View style={[
-        styles.messageContainer, 
-        item.isUser ? styles.userMessage : styles.botMessage,
-        isError && styles.errorMessage
+        styles.messageWrapper,
+        item.isUser ? styles.userMessageWrapper : styles.botMessageWrapper
       ]}>
-        {item.isUser ? (
-          <Text style={[
-            styles.messageText,
-            styles.userMessageText,
-          ]}>
-            {item.text}
-          </Text>
-        ) : (
-          <ScrollView style={styles.markdownScrollView}>
-            <Markdown 
-              styles={markdownStyles}
-              enableLightBox={false}
-            >
+        <View style={[
+          styles.messageContainer, 
+          item.isUser ? styles.userMessage : styles.botMessage,
+          isError && styles.errorMessage
+        ]}>
+          {item.isUser ? (
+            <Text style={styles.userMessageText}>
+              {item.text}
+            </Text>
+          ) : (
+            <Markdown style={markdownStyles}>
               {item.text}
             </Markdown>
-          </ScrollView>
-        )}
-        
-        <View style={styles.messageFooter}>
-          {!item.isUser && item.metadata?.timeTaken && (
-            <View style={styles.timeTakenContainer}>
-              <Clock size={12} color="rgba(255, 255, 255, 0.7)" />
-              <Text style={styles.timeTakenText}>
-                {item.metadata.timeTaken.toFixed(2)}s
-              </Text>
-            </View>
           )}
-          
-          {isError && (
-            <View style={styles.errorIndicator}>
-              <AlertCircle size={12} color="#FF6B6B" />
-            </View>
-          )}
-          
-          <Text style={[
-            styles.messageTime,
-            item.isUser && styles.userMessageTime
-          ]}>
-            {formatTime(item.timestamp)}
-          </Text>
         </View>
       </View>
     );
@@ -151,14 +94,6 @@ const ChatbotScreen: React.FC = () => {
           headerShown: false,
         }} 
       />
-      
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <ArrowLeft size={24} color="#FFF" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Trò chuyện</Text>
-        <View style={{ width: 24 }} />
-      </View>
 
       <FlatList
         ref={flatListRef}
@@ -166,12 +101,13 @@ const ChatbotScreen: React.FC = () => {
         renderItem={renderMessage}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.messagesList}
+        showsVerticalScrollIndicator={false}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         ListFooterComponent={isLoading ? (
           <View style={styles.loadingContainer}>
             <View style={styles.loadingBubble}>
-              <ActivityIndicator size="small" color="#FFFFFF" />
-              <Text style={styles.loadingText}>Đang xử lý...</Text>
+              <ActivityIndicator size="small" color="#6B7280" />
+              <Text style={styles.loadingText}>Thinking...</Text>
             </View>
           </View>
         ) : null}
@@ -179,34 +115,36 @@ const ChatbotScreen: React.FC = () => {
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        keyboardVerticalOffset={0}
+        style={styles.keyboardAvoidingView}
       >
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder="Hỏi điều gì đó..."
-            placeholderTextColor="#999"
-            multiline
-            maxLength={500}
-            editable={!isLoading}
-          />
-          <TouchableOpacity
-            style={({ pressed }) => [
-              styles.sendButton,
-              pressed && styles.sendButtonPressed,
-              isLoading && styles.sendButtonDisabled
-            ]}
-            onPress={handleSendMessage}
-            disabled={isLoading || inputText.trim() === ''}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Send size={20} color="white" />
-            )}
-          </TouchableOpacity>
+        <View style={[styles.inputContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.inputWrapper}>
+            <TextInput
+              style={styles.input}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Type your message..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              maxLength={500}
+              editable={!isLoading}
+            />
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                (!inputText.trim() || isLoading) && styles.sendButtonDisabled
+              ]}
+              onPress={handleSendMessage}
+              disabled={isLoading || inputText.trim() === ''}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Send size={18} color="white" />
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -216,143 +154,132 @@ const ChatbotScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#121212',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#1D1E33',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-  },
-  headerTitle: {
-    fontFamily: 'Inter-Bold',
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
   },
   messagesList: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 20,
+    flexGrow: 1,
+  },
+  messageWrapper: {
+    marginBottom: 12,
+    paddingHorizontal: 2,
+  },
+  userMessageWrapper: {
+    alignItems: 'flex-end',
+  },
+  botMessageWrapper: {
+    alignItems: 'flex-start',
   },
   messageContainer: {
     padding: 12,
-    borderRadius: 18,
-    marginBottom: 12,
-    maxWidth: '80%',
+    borderRadius: 16,
+    width: '96%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   userMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#F57C00',
+    backgroundColor: '#1F2937',
+    borderBottomRightRadius: 4,
   },
   botMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#2A2B3D',
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+    borderWidth: 1,
+    borderBottomLeftRadius: 4,
   },
   errorMessage: {
-    backgroundColor: 'rgba(255, 107, 107, 0.2)',
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
     borderWidth: 1,
-    borderColor: '#FF6B6B',
-  },
-  messageText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: '#FFF',
   },
   userMessageText: {
-    color: 'white',
-  },
-  errorMessageText: {
-    color: '#FFD1D1',
-  },
-  markdownScrollView: {
-    maxHeight: 400, // Limit height for very long markdown content
-  },
-  messageFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 4,
-  },
-  messageTime: {
     fontFamily: 'Inter-Regular',
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontSize: 14,
+    color: '#FFFFFF',
+    lineHeight: 20,
   },
-  userMessageTime: {
-    color: 'rgba(255, 255, 255, 0.7)',
-  },
-  timeTakenContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  timeTakenText: {
-    fontFamily: 'Inter-Regular',
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginLeft: 2,
-  },
-  errorIndicator: {
-    marginRight: 6,
+  keyboardAvoidingView: {
+    width: '100%',
   },
   inputContainer: {
-    flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#1D1E33',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#2A2B3D',
-    alignItems: 'center',
+    borderTopColor: '#E5E7EB',
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   input: {
     flex: 1,
-    backgroundColor: '#2A2B3D',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
     fontFamily: 'Inter-Regular',
-    fontSize: 16,
-    color: '#FFF',
-    maxHeight: 100,
+    fontSize: 14,
+    color: '#1F2937',
+    maxHeight: 120,
+    minHeight: 40,
+    paddingVertical: 8,
+    paddingRight: 8,
   },
   sendButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F57C00',
+    backgroundColor: '#6366F1',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
   },
-  sendButtonPressed: {
-    backgroundColor: '#D66A00',
-  },
   sendButtonDisabled: {
-    backgroundColor: '#666',
+    backgroundColor: '#D1D5DB',
   },
   loadingContainer: {
-    padding: 8,
+    paddingHorizontal: 2,
     alignItems: 'flex-start',
   },
   loadingBubble: {
-    backgroundColor: '#2A2B3D',
-    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#E5E7EB',
+    borderWidth: 1,
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
     padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
+    width: '96%',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
   },
   loadingText: {
     fontFamily: 'Inter-Regular',
-    fontSize: 14,
-    color: '#FFF',
+    fontSize: 13,
+    color: '#6B7280',
     marginLeft: 8,
   },
 });
