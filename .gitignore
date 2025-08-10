@@ -62,3 +62,5 @@ coverage/
 frontend/.cache/
 frontend/tmp/
 frontend/.vercel/
+backend/model/*
+.gitignore
