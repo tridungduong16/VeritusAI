@@ -1,41 +1,8 @@
 modules:
-  - name: document_parser
-    enabled: false
-    params:
-      input_path: "./data/input_brochure"
-      output_path: "./data/output_brochure"
-
-  - name: create_collection
-    enabled: false
-    params:
-      collection_name : "brochure"
-
-  - name: insert_markdown_folder_to_db
-    enabled: false
-    params:
-      input_path: "./data/output_brochure"
-      collection_name: "brochure"
-
-  - name: convert_pdf_folder_to_markdown_and_add_image_description_and_table
-    enabled: false
-    params:
-      pdf_folder_path: "./data/input_brochure/"
-      md_folder_path: "./data/output_brochure/"
-      images_dir: "./data/output_brochure/images"
-
-  - name: similar_search
-    enabled: false
-    params:
-      collection_name: "brochure"
-      query: "What is the maximum load capacity of D50sC-5?"
-
-  - name: check_conversation_in_db
-    enabled: false
-
-  - name: chat_with_agent
-    enabled: true
-
-  - name: news_api
-    enabled: true
-    params:
-      query: "bitcoin"
+- name: convert_markdown_folder_to_speech
+  enabled: true
+  params:
+    input_path: "./data/results/doi-song"
+    output_path: "./data/results/doi-song-speech"
+    language: "vi"
+    overwrite: true

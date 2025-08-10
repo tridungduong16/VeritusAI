@@ -36,4 +36,6 @@ dependencies = [
     "git-filter-repo>=2.47.0",
     "newsapi-python>=0.2.7",
     "maturin>=1.9.1",
+    "soundfile>=0.13.1",
+    "openai>=1.93.0",
 ]

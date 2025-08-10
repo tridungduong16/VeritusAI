@@ -35,9 +35,3 @@ def get_latest_general_news():
         raise Exception(f"❌ API request failed: {response.status_code} - {response.text}")
     data = response.json()
     return data.get("results", [])[:20]
-
-
-# result = get_latest_news()
-# print(result)
-# import pdb
-# pdb.set_trace()

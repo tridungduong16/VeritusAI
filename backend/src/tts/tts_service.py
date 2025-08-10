@@ -1,253 +1,216 @@
-import io
-import logging
 import os
-import re
-import tempfile
-import warnings
-import soundfile as sf
-import torch
-from fastapi import HTTPException
-from typing import List, Optional
-from TTS.tts.configs.xtts_config import XttsConfig
-from TTS.tts.models.xtts import Xtts
+from pathlib import Path
+from typing import Iterable, Optional, Union
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from openai import OpenAI
 from src.app_config import app_config
-warnings.filterwarnings("ignore")
 
-class TTSService:
-    def __init__(self, model_path: str = None):
-        self.device = "cpu"
-        self.logger = logging.getLogger(__name__)
-        torch.set_num_threads(2)
-        try:
-            if model_path is None:
-                model_path = app_config.TTS_MODEL_PATH
-            if model_path and os.path.exists(model_path):
-                config_path = os.path.join(model_path, "config.json")
-                if os.path.exists(config_path):
-                    self.config = XttsConfig()
-                    self.config.load_json(config_path)
-                    self.model = Xtts.init_from_config(self.config)
-                    self.model.load_checkpoint(
-                        self.config, checkpoint_dir=model_path, eval=True
-                    )
-                    self.model.to(self.device)
-                    self.logger.info(f"viXTTS model loaded from {model_path}")
-                else:
-                    raise FileNotFoundError(f"config.json not found in {model_path}")
-            else:
-                raise FileNotFoundError(
-                    f"Model path {model_path} does not exist or is invalid."
-                )
-        except Exception as e:
-            self.logger.error(f"Error loading viXTTS model: {e}")
-            raise e
+os.environ["OPENAI_API_KEY"] = app_config.OPENAI_API_KEY
 
-    def synthesize_speech(
-        self, text: str, speaker_wav: str = None, language: str = "vi"
-    ):
-        try:
-            self.logger.debug(f"TTS synthesis for: '{text[:50]}...'")
-            gpt_cond_latent = None
-            speaker_embedding = None
-            if speaker_wav:
-                gpt_cond_latent, speaker_embedding = (
-                    self.model.get_conditioning_latents(
-                        audio_path=speaker_wav,
-                        gpt_cond_len=self.config.gpt_cond_len,
-                        max_ref_length=self.config.max_ref_len,
-                        sound_norm_refs=self.config.sound_norm_refs,
-                    )
-                )
-            else:
-                sample_path = os.path.join(app_config.TTS_MODEL_PATH, "vi_sample.wav")
-                if os.path.exists(sample_path):
-                    gpt_cond_latent, speaker_embedding = (
-                        self.model.get_conditioning_latents(
-                            audio_path=sample_path,
-                            gpt_cond_len=self.config.gpt_cond_len,
-                            max_ref_length=self.config.max_ref_len,
-                            sound_norm_refs=self.config.sound_norm_refs,
-                        )
-                    )
-                else:
-                    raise HTTPException(
-                        status_code=400, detail="No speaker reference available."
-                    )
-            outputs = self.model.inference(
-                text=text,
-                language=language,
-                gpt_cond_latent=gpt_cond_latent,
-                speaker_embedding=speaker_embedding,
-                temperature=0.1,
-                length_penalty=1.0,
-                repetition_penalty=10.0,
-                top_k=5,
-                top_p=0.1,
-            )
-            audio_buffer = io.BytesIO()
-            sf.write(
-                audio_buffer,
-                outputs["wav"],
-                self.config.audio.sample_rate,
-                format="WAV",
-            )
-            audio_bytes = audio_buffer.getvalue()
-            audio_buffer.close()
-            self.logger.debug(f"TTS completed, audio size: {len(audio_bytes)} bytes")
-            return audio_bytes
-        except HTTPException as e:
-            self.logger.error(f"HTTP error in TTS synthesis: {e.detail}")
-            raise e
-        except Exception as e:
-            self.logger.error(f"Error in speech synthesis: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Speech synthesis failed: {str(e)}"
-            )
 
-    def synthesize_speech_to_file(
-        self, text: str, speaker_wav: str = None, language: str = "vi"
-    ):
-        try:
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp_file:
-                output_path = tmp_file.name
-            audio_bytes = self.synthesize_speech(text, speaker_wav, language)
-            with open(output_path, "wb") as f:
-                f.write(audio_bytes)
-            self.logger.debug(f"TTS audio saved to: {output_path}")
-            return output_path
-        except Exception as e:
-            self.logger.error(f"Error in file-based synthesis: {e}")
-            raise HTTPException(
-                status_code=500, detail=f"Speech synthesis failed: {str(e)}"
-            )
+class VNTextToSpeech:
+    """
+    Vietnamese Text-to-Speech helper using OpenAI Audio API.
 
-    def _markdown_to_text(self, content: str) -> str:
-        """Convert basic Markdown content to plain text.
+    - Default model: gpt-4o-mini-tts (supports prompting for tone, speed, etc.)
+    - Default voice: "coral"
+    - Default format: "mp3"
 
-        This function performs lightweight cleanup to make Markdown more TTS-
-        friendly. It removes code fences, inline code, images, converts links
-        to their text, strips headings/emphasis markers, and normalizes
-        whitespace.
+    Notes:
+      * Provide clear disclosure that the voice is AI-generated (policy requirement).
+      * Voices are currently optimized for English, but model can speak multiple languages.
+    """
 
-        Args:
-            content (str): Raw Markdown content.
-
-        Returns:
-            str: Plain text suitable for TTS input.
-        """
-        # Remove fenced code blocks
-        text = re.sub(r"```[\s\S]*?```", " ", content)
-        # Remove inline code
-        text = re.sub(r"`[^`]*`", " ", text)
-        # Replace images with their alt text
-        text = re.sub(r"!\[([^\]]*)\]\([^\)]*\)", r"\1", text)
-        # Replace links with their visible text
-        text = re.sub(r"\[([^\]]+)\]\(([^\)]*)\)", r"\1", text)
-        # Strip Markdown list markers and headings/emphasis
-        text = re.sub(r"^\s{0,3}([*\-+]\s+)", "", text, flags=re.MULTILINE)
-        text = re.sub(r"^\s{0,6}#{1,6}\s*", "", text, flags=re.MULTILINE)
-        text = re.sub(r"[*_]{1,3}([^*_]+)[*_]{1,3}", r"\1", text)
-        # Remove leftover HTML tags (basic sanitization)
-        text = re.sub(r"<[^>]+>", " ", text)
-        # Normalize whitespace
-        text = re.sub(r"\s+", " ", text).strip()
-        return text
-
-    def convert_markdown_folder_to_speech(
+    def __init__(
         self,
-        input_folder: str,
-        output_folder: str,
-        speaker_wav: Optional[str] = None,
-        language: str = "vi",
-        overwrite: bool = False,
-    ) -> List[str]:
-        """Convert all Markdown files in a folder to speech files.
-
-        For each ``.md`` file in ``input_folder``, this function reads the
-        Markdown, converts it to plain text, synthesizes speech using the
-        configured TTS model, and writes a ``.wav`` file with the same base
-        filename to ``output_folder``.
-
-        Args:
-            input_folder (str): Path to the directory containing ``.md`` files.
-            output_folder (str): Path to the directory to write ``.wav`` files.
-            speaker_wav (Optional[str]): Optional path to a reference speaker
-                WAV file for voice cloning.
-            language (str): Language code for synthesis. Defaults to ``"vi"``.
-            overwrite (bool): Whether to overwrite existing output files.
-
-        Returns:
-            List[str]: List of absolute paths to generated ``.wav`` files.
-
-        Raises:
-            HTTPException: If the input folder does not exist or another error
-                occurs during processing.
+        api_key: Optional[str] = None,
+        model: str = "gpt-4o-mini-tts",
+        voice: str = "coral",
+        response_format: str = "mp3",
+        default_instructions: str = (
+            "Đọc tiếng Việt rõ ràng, tự nhiên, tốc độ vừa phải, "
+            "ngắt câu hợp lý, giữ nguyên dấu và tên riêng."
+        ),
+    ):
         """
-        try:
-            if not os.path.isdir(input_folder):
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Input folder not found: {input_folder}",
-                )
+        Create a client and set sensible defaults for Vietnamese speech.
+        """
+        if api_key:
+            os.environ["OPENAI_API_KEY"] = api_key
 
-            os.makedirs(output_folder, exist_ok=True)
+        self.client = OpenAI()
+        self.model = model
+        self.voice = voice
+        self.response_format = response_format  # mp3 | wav | opus | flac | aac | pcm
+        self.default_instructions = default_instructions
 
-            generated_files: List[str] = []
-            for entry in sorted(os.listdir(input_folder)):
-                if not entry.lower().endswith(".md"):
-                    continue
+    def synthesize_to_file(
+        self,
+        text: str,
+        out_path: Union[str, Path],
+        *,
+        voice: Optional[str] = None,
+        model: Optional[str] = None,
+        response_format: Optional[str] = None,
+        instructions: Optional[str] = None,
+        stream: bool = True,
+    ) -> Path:
+        """
+        Convert `text` to speech and write to `out_path`.
+        Uses streamed response by default for faster start/playback.
 
-                input_path = os.path.join(input_folder, entry)
-                if not os.path.isfile(input_path):
-                    continue
+        Returns the destination Path.
+        """
+        if not text or not text.strip():
+            raise ValueError("Input text is empty.")
 
-                base_name, _ = os.path.splitext(entry)
-                output_path = os.path.join(output_folder, f"{base_name}.wav")
+        out_path = Path(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
 
-                if os.path.exists(output_path) and not overwrite:
-                    self.logger.info(
-                        f"Skipping existing file (overwrite=False): {output_path}"
-                    )
-                    generated_files.append(os.path.abspath(output_path))
-                    continue
+        voice = voice or self.voice
+        model = model or self.model
+        response_format = response_format or self.response_format
+        instructions = instructions or self.default_instructions
 
+        if stream:
+            # Streaming write (chunked) – fastest for longer content
+            with self.client.audio.speech.with_streaming_response.create(
+                model=model,
+                voice=voice,
+                input=text,
+                instructions=instructions,
+                response_format=response_format,
+            ) as response:
+                response.stream_to_file(out_path)
+        else:
+            # Non-streaming – receive full bytes then write
+            response = self.client.audio.speech.create(
+                model=model,
+                voice=voice,
+                input=text,
+                instructions=instructions,
+                response_format=response_format,
+            )
+            # response is a binary-like object; write to disk
+            with open(out_path, "wb") as f:
+                f.write(response.read())
+
+        return out_path
+
+    def convert_file(
+        self,
+        txt_path: Union[str, Path],
+        out_path: Optional[Union[str, Path]] = None,
+        *,
+        response_format: Optional[str] = None,
+        voice: Optional[str] = None,
+        model: Optional[str] = None,
+        instructions: Optional[str] = None,
+        stream: bool = True,
+    ) -> Path:
+        """
+        Read a single .txt file and synthesize one audio file.
+        If `out_path` is not given, writes next to the .txt with the chosen extension.
+        """
+        txt_path = Path(txt_path)
+        if not txt_path.is_file():
+            raise FileNotFoundError(f"Text file not found: {txt_path}")
+
+        text = txt_path.read_text(encoding="utf-8")
+        ext = f".{(response_format or self.response_format).lower()}"
+        out_path = Path(out_path) if out_path else txt_path.with_suffix(ext)
+
+        return self.synthesize_to_file(
+            text=text,
+            out_path=out_path,
+            voice=voice,
+            model=model,
+            response_format=response_format,
+            instructions=instructions,
+            stream=stream,
+        )
+
+    def convert_folder(
+        self,
+        folder: Union[str, Path],
+        pattern: str = "*.txt",
+        out_dir: Optional[Union[str, Path]] = None,
+        *,
+        response_format: Optional[str] = None,
+        voice: Optional[str] = None,
+        model: Optional[str] = None,
+        instructions: Optional[str] = None,
+        stream: bool = True,
+        max_workers: int = 4,
+        overwrite: bool = False,
+    ) -> list[Path]:
+        """
+        Convert all matching .txt files in `folder` to audio.
+        Returns list of output Paths. Uses a thread pool for parallelism.
+
+        - `out_dir`: where to place audio files (mirrors filenames). Defaults to `folder`.
+        - `overwrite`: if False, skips files that already exist.
+        """
+        folder = Path(folder)
+        if not folder.is_dir():
+            raise NotADirectoryError(f"Folder not found: {folder}")
+
+        out_dir = Path(out_dir) if out_dir else folder
+        out_dir.mkdir(parents=True, exist_ok=True)
+        ext = f".{(response_format or self.response_format).lower()}"
+
+        txt_files: Iterable[Path] = sorted(folder.glob(pattern))
+        if not txt_files:
+            return []
+
+        futures = {}
+        results: list[Path] = []
+
+        def _job(txt_file: Path) -> Optional[Path]:
+            target = (out_dir / txt_file.with_suffix(ext).name)
+            if target.exists() and not overwrite:
+                return target
+            text = txt_file.read_text(encoding="utf-8")
+            return self.synthesize_to_file(
+                text=text,
+                out_path=target,
+                voice=voice,
+                model=model,
+                response_format=response_format,
+                instructions=instructions,
+                stream=stream,
+            )
+
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            for f in txt_files:
+                futures[ex.submit(_job, f)] = f
+
+            for fut in as_completed(futures):
                 try:
-                    with open(input_path, "r", encoding="utf-8") as f:
-                        markdown_content = f.read()
-                    text = self._markdown_to_text(markdown_content)
-                    if not text:
-                        self.logger.warning(
-                            f"Empty content after Markdown cleanup: {input_path}"
-                        )
-                        continue
+                    outp = fut.result()
+                    if outp:
+                        results.append(outp)
+                except Exception as e:
+                    # You might want to log or collect errors here instead of raising
+                    print(f"[WARN] Failed on {futures[fut].name}: {e}")
 
-                    self.logger.debug(
-                        f"Synthesizing TTS for '{entry}' (length={len(text)})"
-                    )
-                    audio_bytes = self.synthesize_speech(
-                        text=text, speaker_wav=speaker_wav, language=language
-                    )
-                    with open(output_path, "wb") as out_f:
-                        out_f.write(audio_bytes)
-                    generated_files.append(os.path.abspath(output_path))
-                    self.logger.info(f"Generated: {output_path}")
-                except HTTPException:
-                    # Re-raise HTTPExceptions to respect status codes upstream
-                    raise
-                except Exception as file_err:
-                    self.logger.error(
-                        f"Failed to process '{input_path}': {file_err}"
-                    )
-                    continue
+        return results
 
-            return generated_files
-        except HTTPException:
-            raise
-        except Exception as e:
-            self.logger.error(
-                f"Error converting Markdown folder to speech: {str(e)}"
-            )
-            raise HTTPException(
-                status_code=500,
-                detail=f"Folder-to-speech conversion failed: {str(e)}",
-            )
+
+if __name__ == "__main__":
+    tts = VNTextToSpeech(
+        model="gpt-4o-mini-tts",
+        voice="coral",
+        response_format="mp3",
+    )
+    out_path = tts.convert_file("/Users/tridungduong16/Documents/GitHub/VeritusAI_v3/data/results/doi-song/url_090.txt")
+
+    # 2) Whole folder (all .txt) to WAV in ./audio_out
+    # outs = tts.convert_folder(
+    #     "texts_vi",
+    #     pattern="*.txt",
+    #     out_dir="audio_out",
+    #     response_format="wav",  # for lower latency playback in some apps
+    #     max_workers=4,
+    # )
+    # print("Wrote:", outs)
