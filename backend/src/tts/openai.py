@@ -4,6 +4,7 @@ from typing import Iterable, Optional, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from openai import OpenAI
 from src.app_config import app_config
+from tqdm import tqdm
 
 os.environ["OPENAI_API_KEY"] = app_config.OPENAI_API_KEY
 
@@ -143,14 +144,8 @@ class VNTextToSpeech:
         stream: bool = True,
         max_workers: int = 4,
         overwrite: bool = False,
+        show_progress: bool = True,  # new flag
     ) -> list[Path]:
-        """
-        Convert all matching .txt files in `folder` to audio.
-        Returns list of output Paths. Uses a thread pool for parallelism.
-
-        - `out_dir`: where to place audio files (mirrors filenames). Defaults to `folder`.
-        - `overwrite`: if False, skips files that already exist.
-        """
         folder = Path(folder)
         if not folder.is_dir():
             raise NotADirectoryError(f"Folder not found: {folder}")
@@ -185,17 +180,20 @@ class VNTextToSpeech:
             for f in txt_files:
                 futures[ex.submit(_job, f)] = f
 
-            for fut in as_completed(futures):
+            # Wrap as_completed with tqdm if enabled
+            iterable = as_completed(futures)
+            if show_progress:
+                iterable = tqdm(iterable, total=len(futures), desc="Converting")
+
+            for fut in iterable:
                 try:
                     outp = fut.result()
                     if outp:
                         results.append(outp)
                 except Exception as e:
-                    # You might want to log or collect errors here instead of raising
                     print(f"[WARN] Failed on {futures[fut].name}: {e}")
 
         return results
-
 
 if __name__ == "__main__":
     tts = VNTextToSpeech(
@@ -203,14 +201,16 @@ if __name__ == "__main__":
         voice="coral",
         response_format="mp3",
     )
-    out_path = tts.convert_file("/Users/tridungduong16/Documents/GitHub/VeritusAI_v3/data/results/doi-song/url_090.txt")
+    # out_path = tts.convert_file("/Users/tridungduong16/Documents/GitHub/VeritusAI_v3/data/results/doi-song/url_090.txt")
 
     # 2) Whole folder (all .txt) to WAV in ./audio_out
-    # outs = tts.convert_folder(
-    #     "texts_vi",
-    #     pattern="*.txt",
-    #     out_dir="audio_out",
-    #     response_format="wav",  # for lower latency playback in some apps
-    #     max_workers=4,
-    # )
-    # print("Wrote:", outs)
+    out_dir = "./data/results/the-gioi-speech"
+    input_dir = "./data/results/the-gioi"
+    outs = tts.convert_folder(
+        input_dir,
+        pattern="*.txt",
+        out_dir=out_dir,
+        response_format="wav",  # for lower latency playback in some apps
+        max_workers=4,
+    )
+    print("Wrote:", outs)

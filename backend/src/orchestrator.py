@@ -10,7 +10,7 @@ from src.database_handler.document_parser import DocumentParser
 from src.database_handler.mongodb_handler import MemoryHandler
 from src.agent import Agent
 from src.schema import UserQuestion, UserThread
-from src.tts.tts_service import TTSService
+from backend.src.tts.openai import TTSService
 
 load_dotenv()
 
